@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cocina segura</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+:root{
+  --acero:#E7EBEE;
+  --acero-2:#D4DBE0;
+  --linea:#B9C3CA;
+  --pizarra:#1F2A33;
+  --pizarra-2:#55626C;
+  --llama:#2F5DFF;
+  --albahaca:#2E8B57;
+  --tomate:#D93A2B;
+  --comanda:#FFFEF9;
+  --display:"Archivo", "Arial Narrow", sans-serif;
+  --texto:"Atkinson Hyperlegible", Verdana, sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--acero);color:var(--pizarra);font:400 17px/1.55 var(--texto)}
+img{display:block;max-width:100%}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--llama);outline-offset:2px}
+.envoltura{max-width:1180px;margin:0 auto;padding:0 20px}
+
+/* ===== cabecera ===== */
+.cabecera{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 0}
+.marca{font:700 20px/1 var(--display);font-stretch:112%;letter-spacing:-.01em;display:flex;align-items:center;gap:10px}
+.marca svg{width:26px;height:26px}
+.conexion{display:flex;align-items:center;gap:8px;font-size:15px;color:var(--pizarra-2);text-align:right}
+.punto{width:10px;height:10px;border-radius:50%;background:var(--linea)}
+.conexion.viva .punto{background:var(--albahaca);box-shadow:0 0 0 4px rgba(46,139,87,.18)}
+.conexion.caida .punto{background:var(--tomate)}
+
+/* ===== estado (lo primero que se ve) ===== */
+.estado{border-radius:22px;padding:34px 34px 30px;background:var(--pizarra);color:#fff;position:relative;overflow:hidden;transition:background .4s}
+.estado[data-nivel="ok"]{background:#1E4D3A}
+.estado[data-nivel="alerta"]{background:var(--tomate)}
+.estado[data-nivel="aviso"]{background:#2B3FA8}
+.estado[data-nivel="sin"]{background:#3A454E}
+.estado h1{margin:0;font:800 clamp(34px,6.4vw,76px)/.98 var(--display);font-stretch:118%;letter-spacing:-.025em;max-width:16ch}
+.estado p{margin:16px 0 0;font-size:19px;max-width:52ch;opacity:.9}
+.quemadores{position:absolute;right:-30px;top:-30px;width:260px;height:260px;opacity:.13;pointer-events:none}
+@media (max-width:640px){.quemadores{display:none}}
+
+/* ===== lecturas: una plancha de acero, no tarjetas ===== */
+.plancha{display:grid;grid-template-columns:repeat(4,1fr);margin-top:18px;background:var(--comanda);border:1px solid var(--linea);border-radius:16px}
+.lectura{padding:20px 22px;border-left:1px solid var(--acero-2)}
+.lectura:first-child{border-left:0}
+.lectura .nombre{font-size:15px;color:var(--pizarra-2)}
+.lectura .valor{font:700 44px/1.05 var(--display);font-stretch:90%;margin-top:6px;font-variant-numeric:tabular-nums}
+.lectura .valor small{font-size:22px;font-weight:600;margin-left:3px}
+.lectura .detalle{font-size:14px;color:var(--pizarra-2);margin-top:4px}
+.lectura.mal .valor{color:var(--tomate)}
+.lectura.bien .valor{color:var(--albahaca)}
+@media (max-width:820px){
+  .plancha{grid-template-columns:1fr 1fr}
+  .lectura:nth-child(3){border-left:0}
+  .lectura:nth-child(n+3){border-top:1px solid var(--acero-2)}
+}
+
+/* ===== secciones ===== */
+section{margin-top:42px}
+h2{font:700 26px/1.15 var(--display);font-stretch:108%;margin:0 0 6px;letter-spacing:-.01em}
+.bajada{margin:0 0 18px;color:var(--pizarra-2);max-width:62ch}
+.dos{display:grid;grid-template-columns:1.6fr 1fr;gap:22px}
+.dos>*{min-width:0}
+@media (max-width:900px){.dos{grid-template-columns:1fr}}
+.panel{background:var(--comanda);border:1px solid var(--linea);border-radius:16px;padding:20px}
+.grafico{height:280px}
+.camara{border-radius:10px;overflow:hidden;background:#C3CBD1;aspect-ratio:4/3;display:grid;place-items:center;color:var(--pizarra-2);font-size:15px}
+.camara img{width:100%;height:100%;object-fit:cover}
+.pie{font-size:14px;color:var(--pizarra-2);margin-top:10px}
+
+/* ===== riel de comandas (avisos de la ia) ===== */
+.riel-cabecera{display:flex;align-items:end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.botones{display:flex;gap:10px;flex-wrap:wrap}
+.boton{border:1px solid var(--pizarra);background:transparent;border-radius:999px;padding:9px 18px;cursor:pointer;font-weight:700}
+.boton:hover{background:var(--acero-2)}
+.boton.lleno{background:var(--llama);border-color:var(--llama);color:#fff}
+.boton.lleno:hover{background:#2149D6}
+.boton[aria-pressed="true"]{background:var(--pizarra);color:#fff}
+.boton:disabled{opacity:.5;cursor:default}
+.riel{margin-top:16px;position:relative;padding-top:14px}
+.riel::before{content:"";position:absolute;left:0;right:0;top:0;height:12px;border-radius:6px;background:linear-gradient(#F4F6F7,#AAB4BB);box-shadow:inset 0 -1px 0 #8E99A1}
+.comandas{display:flex;gap:16px;overflow-x:auto;padding:0 2px 18px;scroll-snap-type:x proximity}
+.comanda{flex:0 0 250px;scroll-snap-align:start;background:var(--comanda);border:1px solid var(--linea);border-top:0;padding:16px 16px 18px;position:relative;
+  clip-path:polygon(0 0,100% 0,100% calc(100% - 8px),92% 100%,84% calc(100% - 8px),76% 100%,68% calc(100% - 8px),60% 100%,52% calc(100% - 8px),44% 100%,36% calc(100% - 8px),28% 100%,20% calc(100% - 8px),12% 100%,4% calc(100% - 8px),0 100%)}
+.comanda::before{content:"";position:absolute;left:50%;top:-6px;width:34px;height:12px;margin-left:-17px;border-radius:3px;background:#8E99A1}
+.comanda .hora{font:700 15px/1 var(--display);font-stretch:85%;display:flex;justify-content:space-between;color:var(--pizarra-2)}
+.comanda .tipo{font:700 19px/1.2 var(--display);font-stretch:105%;margin:10px 0 6px}
+.comanda.gas .tipo,.comanda.calor .tipo{color:var(--tomate)}
+.comanda.movimiento .tipo{color:#2B3FA8}
+.comanda p{margin:0;font-size:15.5px}
+.comanda img{margin-top:12px;border-radius:6px;aspect-ratio:4/3;object-fit:cover;width:100%}
+.comanda .marca-ia{font-size:12.5px;color:var(--pizarra-2)}
+.vacio{padding:28px 4px;color:var(--pizarra-2)}
+@media (prefers-reduced-motion:no-preference){
+  .comanda.nueva{animation:colgar .55s cubic-bezier(.2,.9,.3,1.2)}
+  @keyframes colgar{from{transform:translateY(-24px) rotate(-2deg);opacity:0}to{transform:none;opacity:1}}
+}
+
+/* ===== asistente ===== */
+.chat{height:330px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:4px 2px 10px}
+.msg{max-width:85%;padding:10px 14px;border-radius:14px;font-size:16px}
+.msg.yo{align-self:flex-end;background:var(--llama);color:#fff;border-bottom-right-radius:4px}
+.msg.ia{align-self:flex-start;background:var(--acero);border-bottom-left-radius:4px}
+.preguntar{display:flex;gap:8px;margin-top:10px}
+.preguntar input{flex:1;min-width:0;border:1px solid var(--linea);border-radius:999px;padding:10px 16px;background:#fff}
+.mic{width:46px;height:46px;border-radius:50%;border:1px solid var(--pizarra);background:transparent;cursor:pointer;display:grid;place-items:center}
+.mic svg{width:20px;height:20px}
+.mic.escuchando{background:var(--tomate);border-color:var(--tomate);color:#fff}
+.sugerencias{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.sugerencias button{border:1px dashed var(--linea);background:transparent;border-radius:999px;padding:6px 12px;font-size:14px;cursor:pointer}
+.reporte{white-space:pre-wrap;font-size:16px;min-height:120px;margin-top:14px}
+.ajuste{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;border-top:1px solid var(--acero-2)}
+.ajuste:first-of-type{border-top:0}
+.ajuste label{font-weight:700}
+.ajuste small{display:block;font-weight:400;color:var(--pizarra-2);font-size:14px}
+.ajuste input[type=number]{width:84px;border:1px solid var(--linea);border-radius:10px;padding:8px 10px;background:#fff}
+.interruptor{width:54px;height:30px;border-radius:999px;border:0;background:var(--linea);position:relative;cursor:pointer;flex:none}
+.interruptor::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform .2s}
+.interruptor[aria-checked="true"]{background:var(--albahaca)}
+.interruptor[aria-checked="true"]::after{transform:translateX(24px)}
+.config-falta{background:#FFF4D6;border:1px solid #E5C76B;border-radius:14px;padding:14px 18px;margin-bottom:18px;display:none}
+footer{margin:56px 0 30px;color:var(--pizarra-2);font-size:14px}
+</style>
+</head>
+<body>
+<div class="envoltura">
+
+  <header class="cabecera">
+    <div class="marca">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="16" cy="16" r="7" fill="none" stroke="#2F5DFF" stroke-width="2.5"/><circle cx="16" cy="16" r="2" fill="currentColor"/></svg>
+      Cocina segura
+    </div>
+    <div class="conexion" id="conexion"><span class="punto"></span><span id="conexionTexto">Conectando…</span></div>
+  </header>
+
+  <div class="config-falta" id="configFalta">
+    Falta configurar la página: abre <b>index.html</b> y pega la URL y la clave pública de tu proyecto de Supabase.
+  </div>
+
+  <div class="estado" id="estado" data-nivel="sin" aria-live="polite">
+    <svg class="quemadores" viewBox="0 0 200 200" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="6"><circle cx="100" cy="100" r="90"/><circle cx="100" cy="100" r="62"/><circle cx="100" cy="100" r="34"/></g></svg>
+    <h1 id="estadoTitulo">Esperando datos del equipo</h1>
+    <p id="estadoDetalle">En cuanto la ESP32-CAM envíe su primera lectura, verás aquí cómo está la cocina.</p>
+  </div>
+
+  <div class="plancha">
+    <div class="lectura" id="lTemp"><div class="nombre">Temperatura</div><div class="valor" id="vTemp">--</div><div class="detalle" id="dTemp">Límite: --</div></div>
+    <div class="lectura" id="lHum"><div class="nombre">Humedad</div><div class="valor" id="vHum">--</div><div class="detalle">Ambiente de la cocina</div></div>
+    <div class="lectura" id="lGas"><div class="nombre">Gas o humo</div><div class="valor" id="vGas">--</div><div class="detalle">Sensor MQ-2</div></div>
+    <div class="lectura" id="lMov"><div class="nombre">Movimiento</div><div class="valor" id="vMov">--</div><div class="detalle" id="dMov">Sensor PIR</div></div>
+  </div>
+
+  <section>
+    <div class="dos">
+      <div>
+        <h2>La última hora</h2>
+        <p class="bajada">Temperatura y humedad registradas cada 10 segundos.</p>
+        <div class="panel"><div class="grafico"><canvas id="grafico" aria-label="Gráfico de temperatura y humedad"></canvas></div></div>
+      </div>
+      <div>
+        <h2>Cámara</h2>
+        <p class="bajada">Se actualiza cada 20 segundos.</p>
+        <div class="panel">
+          <div class="camara" id="camara">Aún no hay foto</div>
+          <div class="pie" id="camaraPie"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="riel-cabecera">
+      <div>
+        <h2>Avisos de la IA</h2>
+        <p class="bajada">Cada vez que un sensor detecta algo, la IA mira la foto y escribe qué pasa y qué hacer.</p>
+      </div>
+      <div class="botones">
+        <button class="boton lleno" id="btnAvisos" aria-pressed="false">Activar avisos y voz</button>
+        <button class="boton" id="btnProbar">Probar un aviso</button>
+      </div>
+    </div>
+    <div class="riel"><div class="comandas" id="comandas"><div class="vacio">Sin avisos por ahora. Cuando pase algo, aparecerá aquí.</div></div></div>
+  </section>
+
+  <section>
+    <div class="dos">
+      <div>
+        <h2>Pregúntale a la cocina</h2>
+        <p class="bajada">Escribe o habla. La IA responde con los datos reales de los sensores.</p>
+        <div class="panel">
+          <div class="chat" id="chat" aria-live="polite"></div>
+          <div class="sugerencias" id="sugerencias">
+            <button>¿Está todo bien ahora?</button>
+            <button>¿Hubo alertas hoy?</button>
+            <button>¿Cómo estuvo la temperatura?</button>
+          </div>
+          <form class="preguntar" id="formChat">
+            <input id="pregunta" placeholder="Escribe tu pregunta" autocomplete="off" aria-label="Pregunta para la IA">
+            <button type="button" class="mic" id="mic" aria-label="Preguntar con la voz">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+            </button>
+            <button class="boton lleno" type="submit">Enviar</button>
+          </form>
+        </div>
+      </div>
+      <div>
+        <h2>Reporte y ajustes</h2>
+        <p class="bajada">Un resumen escrito por la IA y la configuración del equipo.</p>
+        <div class="panel">
+          <div class="botones">
+            <button class="boton" data-horas="1">Reporte de la última hora</button>
+            <button class="boton" data-horas="24">Reporte de 24 horas</button>
+          </div>
+          <div class="reporte" id="reporte">Elige un periodo para generar el reporte.</div>
+        </div>
+        <div class="panel" style="margin-top:18px">
+          <div class="ajuste">
+            <label for="swMov">Alarma de movimiento<small>El buzzer suena y se crea un aviso cuando alguien se mueve.</small></label>
+            <button class="interruptor" id="swMov" role="switch" aria-checked="true"></button>
+          </div>
+          <div class="ajuste">
+            <label for="limite">Límite de temperatura<small>Por encima de este valor se crea un aviso.</small></label>
+            <span style="white-space:nowrap"><input type="number" id="limite" min="20" max="80" step="1"> °C</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>Sistema de seguridad para la cocina de restaurantes, hecho con ESP32-CAM, Supabase y Gemini.</footer>
+</div>
+
+<script>
+// ================== configuracion ==================
+const SUPABASE_URL = 'https://jmfubvpaoamwaxydptwa.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_WfifNHuLwsOUYmeNOE2tQA_XLW-yEuZ';
+// ===================================================
+
+const $ = id => document.getElementById(id);
+const configurada = !SUPABASE_URL.includes('TU_PROYECTO');
+if (!configurada) $('configFalta').style.display = 'block';
+const sb = configurada ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+const FOTO = SUPABASE_URL + '/storage/v1/object/public/fotos/actual.jpg';
+
+let config = { temp_limite: 35, alarma_movimiento: true };
+let ultima = null;
+let lecturas = [];
+let alertas = [];
+let avisosActivos = false;
+let grafico = null;
+
+const horaCorta = d => new Date(d).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+const horaLarga = d => new Date(d).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+// ================== voz y notificaciones ==================
+function hablar(texto) {
+  if (!avisosActivos || !('speechSynthesis' in window)) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(texto);
+  u.lang = 'es-ES';
+  const v = speechSynthesis.getVoices().find(x => x.lang.startsWith('es'));
+  if (v) u.voice = v;
+  speechSynthesis.speak(u);
+}
+if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = () => {};
+
+function notificar(texto) {
+  if (!avisosActivos) return;
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try { new Notification('Cocina segura', { body: texto }); } catch (e) {}
+  }
+  hablar(texto);
+}
+
+$('btnAvisos').onclick = async () => {
+  if (avisosActivos) {
+    avisosActivos = false;
+    speechSynthesis.cancel();
+  } else {
+    avisosActivos = true;
+    if ('Notification' in window && Notification.permission === 'default') {
+      try { await Notification.requestPermission(); } catch (e) {}
+    }
+    hablar('Avisos activados. Te leeré las alertas de la cocina.');
+  }
+  $('btnAvisos').setAttribute('aria-pressed', avisosActivos);
+  $('btnAvisos').textContent = avisosActivos ? 'Avisos y voz activados' : 'Activar avisos y voz';
+};
+
+// ================== estado general ==================
+function enLinea() {
+  return ultima && (Date.now() - new Date(ultima.creado_en).getTime()) < 40000;
+}
+
+function pintarEstado() {
+  const e = $('estado'), t = $('estadoTitulo'), d = $('estadoDetalle');
+  const c = $('conexion'), ct = $('conexionTexto');
+  if (!ultima) {
+    c.className = 'conexion';
+    ct.textContent = 'Sin datos';
+    return;
+  }
+  const seg = Math.round((Date.now() - new Date(ultima.creado_en).getTime()) / 1000);
+  if (enLinea()) {
+    c.className = 'conexion viva';
+    ct.textContent = seg <= 2 ? 'Equipo conectado, al día' : `Equipo conectado, hace ${seg} s`;
+  } else {
+    c.className = 'conexion caida';
+    ct.textContent = 'Sin señal del equipo';
+  }
+
+  const temp = ultima.temperatura;
+  const calor = temp != null && temp >= config.temp_limite;
+  if (!enLinea()) {
+    e.dataset.nivel = 'sin';
+    t.textContent = 'Sin señal del equipo';
+    d.textContent = `La última lectura llegó a las ${horaLarga(ultima.creado_en)}. Revisa que la ESP32-CAM esté prendida y con wifi.`;
+  } else if (ultima.gas) {
+    e.dataset.nivel = 'alerta';
+    t.textContent = 'Hay gas o humo en la cocina';
+    d.textContent = 'Apaga las hornillas, abre ventanas y no enciendas fuego hasta que el aire esté limpio.';
+  } else if (calor) {
+    e.dataset.nivel = 'alerta';
+    t.textContent = `Hace demasiado calor: ${temp.toFixed(1)} °C`;
+    d.textContent = `Se pasó el límite de ${config.temp_limite} °C. Revisa los equipos encendidos y la ventilación.`;
+  } else if (ultima.movimiento && config.alarma_movimiento) {
+    e.dataset.nivel = 'aviso';
+    t.textContent = 'Hay movimiento en la cocina';
+    d.textContent = 'El sensor detectó a alguien. Mira la cámara para confirmar quién es.';
+  } else {
+    e.dataset.nivel = 'ok';
+    t.textContent = 'Todo en orden en la cocina';
+    d.textContent = 'Sin gas ni humo, temperatura dentro del límite y sin alertas activas.';
+  }
+}
+
+function pintarLecturas() {
+  if (!ultima) return;
+  const t = ultima.temperatura, h = ultima.humedad;
+  $('vTemp').innerHTML = t == null ? 'sin dato' : `${t.toFixed(1)}<small>°C</small>`;
+  $('dTemp').textContent = `Límite: ${config.temp_limite} °C`;
+  $('lTemp').className = 'lectura' + (t != null && t >= config.temp_limite ? ' mal' : '');
+  $('vHum').innerHTML = h == null ? 'sin dato' : `${Math.round(h)}<small>%</small>`;
+  $('vGas').textContent = ultima.gas ? 'Detectado' : 'Normal';
+  $('lGas').className = 'lectura ' + (ultima.gas ? 'mal' : 'bien');
+  $('vMov').textContent = ultima.movimiento ? 'Sí' : 'No';
+  $('lMov').className = 'lectura' + (ultima.movimiento && config.alarma_movimiento ? ' mal' : '');
+  $('dMov').textContent = config.alarma_movimiento ? 'Alarma activada' : 'Alarma desactivada';
+  pintarEstado();
+}
+
+// ================== grafico ==================
+function crearGrafico() {
+  grafico = new Chart($('grafico'), {
+    type: 'line',
+    data: { labels: [], datasets: [
+      { label: 'Temperatura (°C)', data: [], borderColor: '#D93A2B', backgroundColor: '#D93A2B', yAxisID: 'y', tension: .35, pointRadius: 0, borderWidth: 2.5 },
+      { label: 'Humedad (%)', data: [], borderColor: '#2F5DFF', backgroundColor: '#2F5DFF', yAxisID: 'y1', tension: .35, pointRadius: 0, borderWidth: 2.5 }
+    ]},
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { labels: { font: { family: 'Atkinson Hyperlegible', size: 14 }, boxWidth: 14 } } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 7, font: { family: 'Atkinson Hyperlegible' } }, grid: { display: false } },
+        y: { position: 'left', ticks: { font: { family: 'Atkinson Hyperlegible' } }, grid: { color: '#E1E6E9' } },
+        y1: { position: 'right', min: 0, max: 100, ticks: { font: { family: 'Atkinson Hyperlegible' } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+function pintarGrafico() {
+  if (!grafico) return;
+  const desde = Date.now() - 3600e3;
+  lecturas = lecturas.filter(l => new Date(l.creado_en).getTime() >= desde);
+  grafico.data.labels = lecturas.map(l => horaCorta(l.creado_en));
+  grafico.data.datasets[0].data = lecturas.map(l => l.temperatura);
+  grafico.data.datasets[1].data = lecturas.map(l => l.humedad);
+  grafico.update('none');
+}
+
+// ================== camara ==================
+function refrescarFoto() {
+  if (!configurada) return;
+  const img = new Image();
+  img.alt = 'Foto actual de la cocina';
+  img.onload = () => {
+    $('camara').replaceChildren(img);
+    $('camaraPie').textContent = 'Última foto: ' + horaLarga(new Date());
+  };
+  img.onerror = () => { $('camaraPie').textContent = 'La cámara todavía no ha subido una foto.'; };
+  img.src = FOTO + '?t=' + Date.now();
+}
+
+// ================== avisos (riel de comandas) ==================
+function tipoDe(evento) {
+  const e = (evento || '').toLowerCase();
+  if (e.includes('gas') || e.includes('humo')) return ['gas', 'Gas o humo'];
+  if (e.includes('temperatura') || e.includes('calor')) return ['calor', 'Calor'];
+  if (e.includes('movimiento')) return ['movimiento', 'Movimiento'];
+  return ['otro', 'Aviso'];
+}
+
+function comanda(a, nueva) {
+  const [clase, nombre] = tipoDe(a.evento);
+  const div = document.createElement('article');
+  div.className = 'comanda ' + clase + (nueva ? ' nueva' : '');
+  const hora = document.createElement('div');
+  hora.className = 'hora';
+  const h1 = document.createElement('span'); h1.textContent = horaCorta(a.creado_en);
+  const h2 = document.createElement('span'); h2.className = 'marca-ia'; h2.textContent = a.con_ia ? 'Escrito por la IA' : 'Aviso automático';
+  hora.append(h1, h2);
+  const tipo = document.createElement('div'); tipo.className = 'tipo'; tipo.textContent = nombre;
+  const p = document.createElement('p'); p.textContent = a.mensaje;
+  div.append(hora, tipo, p);
+  if (a.foto_url) {
+    const img = document.createElement('img');
+    img.src = a.foto_url; img.alt = 'Foto del momento del aviso'; img.loading = 'lazy';
+    div.append(img);
+  }
+  return div;
+}
+
+function pintarAlertas() {
+  const cont = $('comandas');
+  cont.replaceChildren();
+  if (!alertas.length) {
+    const v = document.createElement('div'); v.className = 'vacio';
+    v.textContent = 'Sin avisos por ahora. Cuando pase algo, aparecerá aquí.';
+    cont.append(v);
+    return;
+  }
+  alertas.forEach(a => cont.append(comanda(a, false)));
+}
+
+$('btnProbar').onclick = async () => {
+  if (!sb) return;
+  const b = $('btnProbar');
+  b.disabled = true; b.textContent = 'Enviando…';
+  const { data, error } = await sb.functions.invoke('asistente', { body: {
+    tipo: 'alerta', evento: 'prueba de avisos desde la página',
+    foto_url: FOTO + '?t=' + Date.now(),
+    temperatura: ultima?.temperatura ?? null, humedad: ultima?.humedad ?? null,
+    gas: ultima?.gas ?? false, movimiento: ultima?.movimiento ?? false
+  }});
+  b.disabled = false; b.textContent = 'Probar un aviso';
+  if (error || data?.error) alert('No se pudo crear el aviso: ' + (data?.error || error.message));
+};
+
+// ================== asistente ==================
+function burbuja(clase, texto) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + clase;
+  d.textContent = texto;
+  $('chat').append(d);
+  $('chat').scrollTop = $('chat').scrollHeight;
+  return d;
+}
+
+async function preguntar(q) {
+  q = q.trim();
+  if (!q || !sb) return;
+  burbuja('yo', q);
+  const b = burbuja('ia', 'Revisando los sensores…');
+  const { data, error } = await sb.functions.invoke('asistente', { body: { tipo: 'chat', pregunta: q } });
+  const texto = error ? 'No pude conectarme con la IA. Intenta de nuevo.' : (data.error || data.texto);
+  b.textContent = texto;
+  if (avisosActivos) hablar(texto);
+}
+
+$('formChat').onsubmit = e => {
+  e.preventDefault();
+  const q = $('pregunta').value;
+  $('pregunta').value = '';
+  preguntar(q);
+};
+$('sugerencias').onclick = e => { if (e.target.tagName === 'BUTTON') preguntar(e.target.textContent); };
+
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (SR) {
+  const rec = new SR();
+  rec.lang = 'es-PE';
+  rec.onresult = e => preguntar(e.results[0][0].transcript);
+  rec.onend = () => $('mic').classList.remove('escuchando');
+  $('mic').onclick = () => {
+    if (!avisosActivos) { avisosActivos = true; $('btnAvisos').setAttribute('aria-pressed', true); $('btnAvisos').textContent = 'Avisos y voz activados'; }
+    $('mic').classList.add('escuchando');
+    try { rec.start(); } catch (e) {}
+  };
+} else {
+  $('mic').disabled = true;
+  $('mic').title = 'Tu navegador no permite dictar. Usa Chrome.';
+}
+
+document.querySelectorAll('[data-horas]').forEach(btn => {
+  btn.onclick = async () => {
+    if (!sb) return;
+    $('reporte').textContent = 'La IA está escribiendo el reporte…';
+    const { data, error } = await sb.functions.invoke('asistente', { body: { tipo: 'reporte', horas: Number(btn.dataset.horas) } });
+    const texto = error ? 'No se pudo generar el reporte. Intenta de nuevo.' : (data.error || data.texto);
+    $('reporte').textContent = texto;
+    if (avisosActivos) hablar(texto);
+  };
+});
+
+// ================== ajustes ==================
+function pintarAjustes() {
+  $('swMov').setAttribute('aria-checked', config.alarma_movimiento);
+  if (document.activeElement !== $('limite')) $('limite').value = config.temp_limite;
+}
+$('swMov').onclick = async () => {
+  if (!sb) return;
+  const nuevo = !config.alarma_movimiento;
+  config.alarma_movimiento = nuevo;
+  pintarAjustes(); pintarLecturas();
+  await sb.from('configuracion').update({ alarma_movimiento: nuevo }).eq('id', 1);
+};
+$('limite').onchange = async () => {
+  if (!sb) return;
+  const v = Number($('limite').value);
+  if (!(v >= 20 && v <= 80)) { pintarAjustes(); return; }
+  config.temp_limite = v;
+  pintarLecturas();
+  await sb.from('configuracion').update({ temp_limite: v }).eq('id', 1);
+};
+
+// ================== carga inicial y tiempo real ==================
+async function cargar() {
+  const desde = new Date(Date.now() - 3600e3).toISOString();
+  const [cfg, lec, al, chat] = await Promise.all([
+    sb.from('configuracion').select('*').eq('id', 1).single(),
+    sb.from('lecturas').select('*').gte('creado_en', desde).order('creado_en', { ascending: true }).limit(500),
+    sb.from('alertas').select('*').order('creado_en', { ascending: false }).limit(20),
+    sb.from('mensajes_chat').select('*').order('creado_en', { ascending: false }).limit(12)
+  ]);
+  if (cfg.data) config = cfg.data;
+  lecturas = lec.data || [];
+  if (lecturas.length) {
+    ultima = lecturas[lecturas.length - 1];
+  } else {
+    const u = await sb.from('lecturas').select('*').order('creado_en', { ascending: false }).limit(1);
+    ultima = u.data?.[0] || null;
+  }
+  alertas = al.data || [];
+  const hist = (chat.data || []).reverse();
+  if (!hist.length) burbuja('ia', 'Hola. Pregúntame por la temperatura, el gas, el movimiento o los avisos de hoy.');
+  hist.forEach(m => burbuja(m.rol === 'ia' ? 'ia' : 'yo', m.texto));
+  pintarAjustes(); pintarLecturas(); pintarGrafico(); pintarAlertas();
+}
+
+function suscribir() {
+  sb.channel('cocina')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lecturas' }, p => {
+      ultima = p.new;
+      lecturas.push(p.new);
+      pintarLecturas(); pintarGrafico();
+    })
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'alertas' }, p => {
+      alertas.unshift(p.new);
+      alertas = alertas.slice(0, 20);
+      const cont = $('comandas');
+      if (cont.querySelector('.vacio')) cont.replaceChildren();
+      cont.prepend(comanda(p.new, true));
+      notificar(p.new.mensaje);
+    })
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'configuracion' }, p => {
+      config = p.new;
+      pintarAjustes(); pintarLecturas();
+    })
+    .subscribe();
+}
+
+crearGrafico();
+if (sb) {
+  cargar().then(suscribir);
+  refrescarFoto();
+  setInterval(refrescarFoto, 20000);
+  setInterval(pintarEstado, 5000);
+}
+</script>
+</body>
+</html>
